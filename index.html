@@ -1127,13 +1127,13 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
       </div>
       
       <!-- Input Manual -->
-      <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
-        <div style="font-size:12px; color:var(--gray-muted); margin-bottom:8px;"><i class="fas fa-keyboard"></i> Atau input manual / link barcode:</div>
-        <div style="display:flex; gap:8px;">
-          <input type="text" id="manualBarcodeInput" style="flex:1; padding:10px 13px; background: var(--gray-dark); border: 1px solid var(--gray-mid); border-radius: var(--radius-sm); color: var(--white); font-family: inherit; font-size: 13px; outline: none; transition: border-color .2s, box-shadow .2s;" placeholder="Masukkan nomor barcode atau link barcode...">
-          <button class="btn btn-primary btn-sm" onclick="useManualBarcode()">Gunakan</button>
-        </div>
+    <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
+      <div style="font-size:12px; color:var(--gray-muted); margin-bottom:8px;"><i class="fas fa-keyboard"></i> Atau input manual:</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="manualBarcodeInput" style="flex:1; padding:10px 13px; background: var(--gray-dark); border:1px solid var(--gray-mid); border-radius: var(--radius-sm); color: var(--white); font-family: inherit; font-size:13px; outline:none; transition:border-color .2s, box-shadow .2s;" placeholder="Masukkan nomor barcode...">
+        <button class="btn btn-primary btn-sm" onclick="useManualBarcode()">Gunakan</button>
       </div>
+    </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline btn-sm" onclick="closeScanModal()">Batal</button>
@@ -2638,12 +2638,6 @@ function setDebug(msg){
   console.log('[Scan Debug]', msg);
 }
 
-// Function to handle barcode input (support both plain barcode and URL barcode)
-function extractBarcodeFromInput(input) {
-  if (!input) return '';
-  return input.trim(); // Kembalikan input as-is untuk membandingkan dengan kolom Barcode dan URL Barcode
-}
-
 // Fungsi untuk memvalidasi format barcode app (misal: ITD-000000000001)
 function isValidAppBarcode(barcode) {
   if (!barcode) return false;
@@ -2665,16 +2659,15 @@ async function openScanModal(){
     // Inisialisasi Html5Qrcode
     html5QrCode = new Html5Qrcode("qr-reader");
     
-    // Konfigurasi scanner untuk sensitivitas maksimal
+    // Konfigurasi scanner untuk sensitivitas maksimal (tanpa qrbox)
     const config = {
-      fps: 20, // Naikkan fps untuk scan lebih sering
-      qrbox: { width: 350, height: 350 }, // Perbesar area scan
+      fps: 25, // Lebih tinggi lagi untuk scan lebih sering
       aspectRatio: 1.333333, // Ratio 4:3, lebih natural untuk kamera
       disableFlip: false, // Izinkan flip
       showTorchButtonIfSupported: true // Tampilkan tombol senter jika didukung
     };
     
-    // Mulai scan tanpa batasan format spesifik (lebih sensitif)
+    // Mulai scan tanpa batasan format spesifik dan tanpa qrbox (scan seluruh area)
     await html5QrCode.start(
       { facingMode: "environment" }, // Kamera belakang
       config,
@@ -2701,16 +2694,12 @@ async function openScanModal(){
   }
 }
 
-function isURL(str) {
-  return str.startsWith('http://') || str.startsWith('https://');
-}
-
 function processBarcode(teksBarcode) {
   const cleanBarcode = teksBarcode.trim();
   setDebug('Memproses barcode: ' + cleanBarcode);
   
-  // Hanya validasi format jika bukan URL
-  if (!isURL(cleanBarcode) && !isValidAppBarcode(cleanBarcode)) {
+  // Validasi format barcode
+  if (!isValidAppBarcode(cleanBarcode)) {
     toast('Barcode tidak sesuai format app! Format: XXX-000000000000', 'warning');
     setDebug('Format barcode salah. Silakan coba barcode app.');
     // Jangan restart, biarkan user scan lagi
@@ -2812,15 +2801,10 @@ function highlightBarcodeRow(barcode) {
 function useManualBarcode(){
   var val = document.getElementById('manualBarcodeInput').value.trim();
   if(val){
-    const barcode = extractBarcodeFromInput(val);
-    if (barcode) {
-      setDebug('Memproses barcode: ' + barcode);
-      processBarcode(barcode);
-    } else {
-      toast('Tidak dapat mengekstrak barcode dari input!', 'warning');
-    }
+    setDebug('Memproses barcode: ' + val);
+    processBarcode(val);
   } else {
-    toast('Masukkan barcode atau link barcode terlebih dahulu!', 'warning');
+    toast('Masukkan nomor barcode terlebih dahulu!', 'warning');
   }
 }
 </script>
