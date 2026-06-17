@@ -1205,6 +1205,9 @@ function rg(fn,args){
       } else if (fn === 'updateInventoryData') {
         payload.id = args[0];
         payload.fd = args[1];
+      } else if (fn === 'uploadImage') {
+        payload.b64Data = args[0];
+        payload.fileName = args[1];
       } else if (args && args.length === 1) {
         // For single argument functions like addInventoryData, deleteInventoryData, etc.
         payload[fn === 'getNextBarcode' ? 'dept' : fn === 'deleteInventoryData' ? 'id' : fn === 'approveInventoryData' ? 'id' : fn === 'unapproveInventoryData' ? 'id' : fn === 'deleteUser' ? 'id' : 'fd'] = args[0];
