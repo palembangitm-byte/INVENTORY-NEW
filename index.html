@@ -2650,9 +2650,10 @@ async function openScanModal(){
     // Inisialisasi Html5Qrcode
     html5QrCode = new Html5Qrcode("qr-reader");
     
-    // Konfigurasi scanner untuk sensitivitas maksimal (tanpa qrbox)
+    // Konfigurasi scanner untuk sensitivitas maksimal
     const config = {
       fps: 60, // FPS maksimal untuk scan tercepat
+      qrbox: { width: 400, height: 400 }, // Area scan besar untuk mencakup sebagian besar video
       aspectRatio: 1.333333, // Ratio 4:3, lebih natural untuk kamera
       disableFlip: false, // Izinkan flip
       showTorchButtonIfSupported: true // Tampilkan tombol senter jika didukung
