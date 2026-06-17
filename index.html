@@ -2656,12 +2656,13 @@ async function openScanModal(){
       qrbox: { width: 400, height: 400 }, // Area scan besar untuk mencakup sebagian besar video
       aspectRatio: 1.333333, // Ratio 4:3, lebih natural untuk kamera
       disableFlip: false, // Izinkan flip
-      showTorchButtonIfSupported: true // Tampilkan tombol senter jika didukung
+      showTorchButtonIfSupported: true, // Tampilkan tombol senter jika didukung
+      videoConstraints: { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } } // Kamera belakang dengan resolusi Full HD
     };
     
     // Mulai scan tanpa batasan format spesifik dan tanpa qrbox (scan seluruh area)
     await html5QrCode.start(
-      { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, // Kamera belakang dengan resolusi Full HD
+      { facingMode: "environment" }, // First parameter: single key for facing mode
       config,
       (decodedText, decodedResult) => {
         // Callback ketika barcode terdeteksi
