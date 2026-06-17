@@ -405,6 +405,7 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
 <!-- LOGIN PAGE -->
 <div id="loginPage">
   <div class="login-bg"></div>
+  <img id="loginLogo" src="" alt="Logo" style="position:absolute;z-index:10;display:none;object-fit:contain;">
   <div class="login-orb login-orb-1"></div>
   <div class="login-orb login-orb-2"></div>
   <div class="login-orb login-orb-3"></div>
@@ -824,7 +825,55 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
           </div>
         </div>
 
-        <!-- CARD 2: Warna Aksen Aplikasi -->
+        <!-- CARD 2: Logo Login Page -->
+        <div class="settings-card" style="grid-column:1/-1">
+          <div class="settings-card-header">
+            <div class="sc-icon"><i class="fas fa-image"></i></div>
+            <div><h4>Logo Login Page</h4><p>Upload dan atur logo yang tampil di halaman login</p></div>
+          </div>
+          <div class="settings-card-body">
+            <!-- Upload Logo -->
+            <div class="bg-dropzone" id="logoDropzone">
+              <input type="file" accept="image/*" id="logoImageFile" onchange="handleLogoUpload(this)">
+              <i class="fas fa-cloud-arrow-up"></i>
+              <p>Klik atau drag logo ke sini</p>
+              <p style="font-size:10px;color:var(--gray-soft);margin-top:4px;">PNG (disarankan transparan), JPG — maks 5MB</p>
+              <div class="dz-fname" id="logoFileName"></div>
+            </div>
+            <div id="logoThumbRow" class="bg-thumb-row" style="display:none">
+              <img id="logoThumbImg" src="" alt="">
+              <div class="bt-info">
+                <div class="bt-name" id="logoThumbName">-</div>
+                <div class="bt-size" id="logoThumbSize">-</div>
+              </div>
+              <button class="action-btn del" onclick="clearLogo()" title="Hapus logo"><i class="fas fa-trash"></i></button>
+            </div>
+            
+            <!-- Logo Size & Position -->
+            <div style="margin-top:16px;display:flex;gap:16px;flex-wrap:wrap;">
+              <div style="flex:1;min-width:200px;">
+                <label style="font-size:11px;font-weight:600;color:var(--gray-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">Ukuran Logo (px)</label>
+                <div style="display:flex;align-items:center;gap:8px;">
+                  <input type="range" id="logoSize" min="40" max="200" value="80" style="width:100%;accent-color:var(--orange);" oninput="document.getElementById('logoSizeVal').textContent=this.value+'px';applySettings();saveLogoSettingsToSpreadsheet()">
+                  <span id="logoSizeVal" style="font-size:11px;color:var(--orange);min-width:40px;font-weight:700">80px</span>
+                </div>
+              </div>
+              <div style="flex:1;min-width:200px;">
+                <label style="font-size:11px;font-weight:600;color:var(--gray-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">Posisi Logo</label>
+                <select id="logoPosition" class="select-style" style="width:100%;" onchange="applySettings();saveLogoSettingsToSpreadsheet()">
+                  <option value="top-left">↖ Atas Kiri</option>
+                  <option value="top-center">⬆ Atas Tengah</option>
+                  <option value="top-right">↗ Atas Kanan</option>
+                  <option value="bottom-left">↙ Bawah Kiri</option>
+                  <option value="bottom-center">⬇ Bawah Tengah</option>
+                  <option value="bottom-right">↘ Bawah Kanan</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- CARD 3: Warna Aksen Aplikasi -->
         <div class="settings-card">
           <div class="settings-card-header">
             <div class="sc-icon"><i class="fas fa-palette"></i></div>
@@ -2204,7 +2253,10 @@ var ST = {
   sidebarTitle  : 'INVENTORY',
   sidebarColor  : '#0C0C0C',
   radius        : 9,
-  tableFontSize : '12px'
+  tableFontSize : '12px',
+  logoUrl       : '',   // URL logo from Drive
+  logoSize      : 80,   // Logo size in pixels
+  logoPosition  : 'top-left' // Logo position: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
 };
 
 var STORAGE_KEY = 'invAppSettings_v1';
@@ -2229,6 +2281,15 @@ async function loadAppSettingsFromSpreadsheet(){
       ST.bgImageUrl = APP_SETTINGS.bgImageUrl;
       ST.bgType = 'image';
     }
+    if(APP_SETTINGS.logoUrl){
+      ST.logoUrl = APP_SETTINGS.logoUrl;
+    }
+    if(APP_SETTINGS.logoSize){
+      ST.logoSize = parseInt(APP_SETTINGS.logoSize) || 80;
+    }
+    if(APP_SETTINGS.logoPosition){
+      ST.logoPosition = APP_SETTINGS.logoPosition;
+    }
     applySettings();
   }catch(e){
     console.log('Error loading app settings:', e);
@@ -2244,6 +2305,23 @@ function syncUIFromState(){
   if(el) el.value = ST.bgColor;
   var el2 = document.getElementById('bgColorHex');
   if(el2) el2.value = ST.bgColor;
+  // Logo settings
+  var logoSizeEl = document.getElementById('logoSize');
+  if(logoSizeEl) {
+    logoSizeEl.value = ST.logoSize || 80;
+    var logoSizeValEl = document.getElementById('logoSizeVal');
+    if(logoSizeValEl) logoSizeValEl.textContent = (ST.logoSize || 80) + 'px';
+  }
+  var logoPosEl = document.getElementById('logoPosition');
+  if(logoPosEl) logoPosEl.value = ST.logoPosition || 'top-left';
+  // Show logo thumbnail if exists
+  var logoThumbRow = document.getElementById('logoThumbRow');
+  var logoThumbImg = document.getElementById('logoThumbImg');
+  var logoFileName = document.getElementById('logoFileName');
+  if(ST.logoUrl && logoThumbRow && logoThumbImg) {
+    logoThumbRow.style.display = 'flex';
+    logoThumbImg.src = ST.logoUrl;
+  }
   // Gradient colors
   var gc1=document.getElementById('gradColor1'),gc2=document.getElementById('gradColor2');
   if(gc1&&gc2){ var gm=ST.bgGradient.match(/#[0-9a-fA-F]{6}/g); if(gm&&gm[0])gc1.value=gm[0]; if(gm&&gm[1])gc2.value=gm[1]; }
@@ -2414,6 +2492,106 @@ async function clearBgImage(){
   autoSaveSettings();
 }
 
+/* ---- Logo Upload ---- */
+async function handleLogoUpload(input){
+  if(!input.files||!input.files[0]) return;
+  var f=input.files[0];
+  if(f.size>5*1024*1024){toast('Logo terlalu besar (maks 5MB)','error');return;}
+  
+  toast('Mengupload logo...','info');
+  
+  try{
+    var reader=new FileReader();
+    reader.onload=async function(e){
+      var b64Data = e.target.result.split(',')[1];
+      
+      // Upload to Drive
+      const imageUrl = await rg('uploadImage', [b64Data, 'logo-' + Date.now() + '-' + f.name]);
+      
+      // Convert to embed URL
+      var embedUrl = imageUrl;
+      var fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)\//);
+      if(fileIdMatch){
+        embedUrl = 'https://lh3.googleusercontent.com/d/' + fileIdMatch[1];
+      }
+      
+      // Save to Spreadsheet
+      await rg('saveAppSettings', [{ 
+        logoUrl: embedUrl, 
+        logoSize: ST.logoSize || 80, 
+        logoPosition: ST.logoPosition || 'top-left' 
+      }]);
+      
+      // Update local state
+      APP_SETTINGS.logoUrl = embedUrl;
+      ST.logoUrl = embedUrl;
+      
+      // Update UI
+      var tr=document.getElementById('logoThumbRow');
+      var ti=document.getElementById('logoThumbImg');
+      var tn=document.getElementById('logoThumbName');
+      var ts=document.getElementById('logoThumbSize');
+      var fn=document.getElementById('logoFileName');
+      if(tr)tr.style.display='flex';
+      if(ti)ti.src=embedUrl;
+      if(tn)tn.textContent=f.name;
+      if(ts)ts.textContent=(f.size/1024).toFixed(0)+' KB';
+      if(fn)fn.textContent=f.name;
+      
+      applySettings();
+      autoSaveSettings();
+      toast('Logo berhasil diupload dan dibagikan ke semua user!','success');
+    };
+    reader.readAsDataURL(f);
+  }catch(e){
+    toast('Gagal upload logo: ' + (e.message || e),'error');
+  }
+}
+
+async function clearLogo(){
+  ST.logoUrl='';
+  APP_SETTINGS.logoUrl='';
+  
+  var tr=document.getElementById('logoThumbRow');if(tr)tr.style.display='none';
+  var fn=document.getElementById('logoFileName');if(fn)fn.textContent='';
+  var fi=document.getElementById('logoImageFile');if(fi)fi.value='';
+  
+  // Clear from Spreadsheet
+  try{
+    await rg('saveAppSettings', [{ logoUrl: '' }]);
+    toast('Logo berhasil dihapus untuk semua user!','success');
+  }catch(e){
+    toast('Gagal menghapus logo: ' + (e.message || e),'error');
+  }
+  
+  applySettings();
+  autoSaveSettings();
+}
+
+// Save logo size and position to Spreadsheet (debounced to avoid too many requests)
+let saveLogoTimeout = null;
+async function saveLogoSettingsToSpreadsheet(){
+  // Only save if we have a logo URL or if size/position changed
+  if(!ST.logoUrl && !APP_SETTINGS.logoUrl) return;
+  
+  // Debounce
+  if(saveLogoTimeout) clearTimeout(saveLogoTimeout);
+  saveLogoTimeout = setTimeout(async () => {
+    try{
+      await rg('saveAppSettings', [{ 
+        logoUrl: APP_SETTINGS.logoUrl || ST.logoUrl,
+        logoSize: ST.logoSize || 80,
+        logoPosition: ST.logoPosition || 'top-left'
+      }]);
+      // Update APP_SETTINGS
+      APP_SETTINGS.logoSize = ST.logoSize;
+      APP_SETTINGS.logoPosition = ST.logoPosition;
+    }catch(e){
+      console.log('Error saving logo settings:', e);
+    }
+  }, 500);
+}
+
 /* ---- BG URL ---- */
 function applyBgUrl(url){ ST.bgImageUrl=url||''; applySettings(); }
 
@@ -2562,7 +2740,45 @@ function applySettings(){
     }
 
     // Apply to lbg instead of loginPage to avoid being covered
-    loginPage.style.background = ''; 
+    loginPage.style.background = '';
+    
+    // ── 9. Logo Login Page ───────────────────────────────────────
+    var loginLogo = document.getElementById('loginLogo');
+    if(loginLogo){
+      // Read logo settings from UI controls if available
+      var logoSizeEl = document.getElementById('logoSize');
+      var logoPosEl = document.getElementById('logoPosition');
+      if(logoSizeEl) ST.logoSize = parseInt(logoSizeEl.value) || 80;
+      if(logoPosEl) ST.logoPosition = logoPosEl.value || 'top-left';
+      
+      // Use APP_SETTINGS values if available (from Spreadsheet)
+      var logoUrl = APP_SETTINGS.logoUrl || ST.logoUrl;
+      var logoSize = APP_SETTINGS.logoSize || ST.logoSize || 80;
+      var logoPosition = APP_SETTINGS.logoPosition || ST.logoPosition || 'top-left';
+      
+      if(logoUrl){
+        loginLogo.style.display = 'block';
+        loginLogo.src = logoUrl;
+        loginLogo.style.width = logoSize + 'px';
+        loginLogo.style.height = logoSize + 'px';
+        
+        // Apply position
+        var positionStyles = {
+          'top-left': { top: '20px', left: '20px', right: 'auto', bottom: 'auto' },
+          'top-center': { top: '20px', left: '50%', transform: 'translateX(-50%)', right: 'auto', bottom: 'auto' },
+          'top-right': { top: '20px', right: '20px', left: 'auto', bottom: 'auto' },
+          'bottom-left': { bottom: '20px', left: '20px', right: 'auto', top: 'auto' },
+          'bottom-center': { bottom: '20px', left: '50%', transform: 'translateX(-50%)', right: 'auto', top: 'auto' },
+          'bottom-right': { bottom: '20px', right: '20px', left: 'auto', top: 'auto' }
+        };
+        var pos = positionStyles[logoPosition] || positionStyles['top-left'];
+        for(var prop in pos){
+          loginLogo.style[prop] = pos[prop];
+        }
+      } else {
+        loginLogo.style.display = 'none';
+      }
+    } 
     // lbg.style.background = bgCss; // Handled individually above to preserve HD properties
 
     // overlay div
@@ -2686,11 +2902,16 @@ function saveAllSettings(){
 /* ---- Reset all to default ---- */
 function resetAllSettings(){
   localStorage.removeItem(STORAGE_KEY);
+  // Also clear APP_SETTINGS from Spreadsheet? Or just local? We'll reset local, but keep Spreadsheet settings (admin can re-upload logo)
   ST={bgType:'color',bgColor:'#080808',bgGradient:'linear-gradient(135deg,#0a0a0a,#1a0a00)',
       bgImageData:'',bgImageUrl:'',bgPattern:'grid',showGrid:true,showOrb:true,overlayOpacity:40,
       accent:'#F97316',showHero:true,animCard:true,appTitle:'INVENTORY APPS',
       appSubtitle:'Sistem manajemen inventaris modern untuk mengelola aset hotel dengan mudah dan efisien.',
-      sidebarTitle:'INVENTORY',sidebarColor:'#0C0C0C',radius:9,tableFontSize:'12px'};
+      sidebarTitle:'INVENTORY',sidebarColor:'#0C0C0C',radius:9,tableFontSize:'12px',
+      logoUrl:'',logoSize:80,logoPosition:'top-left'};
+  // Hide logo thumbnail
+  var logoThumbRow = document.getElementById('logoThumbRow');
+  if(logoThumbRow) logoThumbRow.style.display='none';
   syncUIFromState();
   applySettings();
   toast('Pengaturan direset ke default','info');
