@@ -2662,13 +2662,22 @@ async function openScanModal(){
     var scanContainer = document.getElementById('scanContainer');
     scanContainer.innerHTML = '<div id="qr-reader" style="width:100%; min-height:240px;"></div>';
     
-    // Inisialisasi html5-qrcode scanner (lebih stabil)
+    // Inisialisasi html5-qrcode scanner dengan fokus CODE 128
     html5QrCodeScanner = new Html5QrcodeScanner(
       "qr-reader", 
       { 
-        fps: 10, 
-        qrbox: { width: 250, height: 250 }, 
-        rememberLastUsedCamera: true
+        fps: 5, // Kurangi fps agar lebih stabil
+        qrbox: { width: 300, height: 300 }, // Perbesar area scan
+        rememberLastUsedCamera: true,
+        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E
+        ]
       }, 
       false // Verbose false
     );
@@ -2677,6 +2686,7 @@ async function openScanModal(){
     html5QrCodeScanner.render(
       function(decodedText, decodedResult) {
         // Barcode terdeteksi!
+        console.log('Barcode detected:', decodedText, decodedResult);
         if (scanActive) {
           setDebug('Barcode terdeteksi!');
           processBarcode(decodedText);
@@ -2684,6 +2694,7 @@ async function openScanModal(){
       },
       function(errorMessage) {
         // Error saat scanning, biarkan saja (normal jika barcode tidak terlihat)
+        // console.log('Scan error:', errorMessage);
       }
     );
     
@@ -2784,7 +2795,20 @@ async function handleBarcodeImageUpload(event) {
   
   try {
     const html5QrCode = new Html5Qrcode("scanContainer");
-    const result = await html5QrCode.scanFile(file, true);
+    const result = await html5QrCode.scanFile(
+      file, 
+      true, 
+      { 
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E
+        ] 
+      }
+    );
     if (result) {
       setDebug('Barcode ditemukan di gambar!');
       processBarcode(result);
