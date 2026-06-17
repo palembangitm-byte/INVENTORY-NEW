@@ -1135,7 +1135,6 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
 
 <!-- SCRIPTS -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
 
 <script>
 /* ============================================================
@@ -2616,6 +2615,11 @@ function resetAllSettings(){
 }
 
 /* ---- Barcode Scan Functions ---- */
+let scanStream = null;
+let barcodeDetector = null;
+let animationFrameId = null;
+let canvas = null;
+let ctx = null;
 
 function setDebug(msg){
   var d=document.getElementById('scanDebug');
@@ -2669,63 +2673,78 @@ function extractBarcodeFromInput(input) {
 async function openScanModal(){
   document.getElementById('scanModal').classList.add('active');
   scanActive = true;
-  setDebug('Memulai scanner...');
+  setDebug('Meminta izin kamera...');
   
-  // Siapkan UI
-  var scanContainer = document.getElementById('scanContainer');
-  scanContainer.innerHTML = '<div id="scannerViewport" style="width:100%; height:240px; border-radius: var(--radius-sm);"></div>';
-  
-  // Initialize QuaggaJS
-  try {
-    await Quagga.init({
-      inputStream: {
-        name: "Live",
-        type: "LiveStream",
-        target: document.querySelector('#scannerViewport'),
-        constraints: {
-          facingMode: "environment",
-          width: 640,
-          height: 480
-        }
-      },
-      decoder: {
-        readers: ["code_128_reader", "ean_reader", "ean_8_reader", "code_39_reader", "upc_reader"]
-      },
-      locate: true
-    }, function(err) {
-      if (err) {
-        setDebug('Gagal inisialisasi scanner: ' + err);
-        toast('Gagal inisialisasi scanner', 'error');
-        return;
-      }
-      setDebug('Scanner siap! Arahkan ke barcode...');
-      Quagga.start();
-    });
+  try{
+    // Ambil stream kamera langsung tanpa tombol
+    let constraints = { video: { facingMode: 'environment', width: 640, height: 480 }, audio: false };
+    try{
+      scanStream = await navigator.mediaDevices.getUserMedia(constraints);
+    } catch(e){
+      setDebug('Kamera belakang gagal, coba depan...');
+      constraints.video.facingMode = 'user';
+      scanStream = await navigator.mediaDevices.getUserMedia(constraints);
+    }
     
-    // Handle detection
-    Quagga.onDetected(function(result) {
-      if (scanActive) {
-        const code = result.codeResult.code;
-        setDebug('Barcode terdeteksi: ' + code);
-        processBarcode(code);
-      }
-    });
+    setDebug('Kamera aktif! Mencari barcode...');
     
-  } catch (e) {
-    setDebug('Error: ' + e.message);
-    toast('Gagal akses scanner: ' + e.message, 'error');
+    // Siapkan UI
+    var scanContainer = document.getElementById('scanContainer');
+    scanContainer.innerHTML = '<video id="scanVideo" style="width:100%; height:100%; object-fit:cover; border-radius: var(--radius-sm);"></video><canvas id="scanCanvas" style="display:none;"></canvas>';
+    
+    var video = document.getElementById('scanVideo');
+    video.srcObject = scanStream;
+    video.setAttribute('autoplay', '');
+    video.setAttribute('playsinline', '');
+    await video.play();
+    
+    // Siapkan canvas dan barcode detector
+    canvas = document.getElementById('scanCanvas');
+    ctx = canvas.getContext('2d');
+    
+    if ('BarcodeDetector' in window) {
+      barcodeDetector = new BarcodeDetector({
+        formats: ['code_128', 'ean_13', 'ean_8', 'code_39', 'upc_a', 'upc_e']
+      });
+      startScanning(video);
+    } else {
+      setDebug('Browser tidak support scan otomatis. Gunakan input manual.');
+    }
+    
+  } catch(e){
+    setDebug('Error: ' + (e.name + ' - ' + e.message));
+    toast('Gagal akses kamera: ' + e.message, 'error');
     console.error(e);
   }
+}
+
+function startScanning(video) {
+  const scanFrame = async () => {
+    if (!scanActive) return;
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    try {
+      const barcodes = await barcodeDetector.detect(canvas);
+      if (barcodes.length > 0 && scanActive) {
+        const barcode = barcodes[0].rawValue;
+        processBarcode(barcode);
+        return;
+      }
+    } catch (e) {
+      // Skip errors, continue scanning
+    }
+    
+    animationFrameId = requestAnimationFrame(scanFrame);
+  };
+  scanFrame();
 }
 
 function processBarcode(teksBarcode) {
   setDebug('Barcode terdeteksi! Mencari data...');
   scanActive = false;
-  
-  // Stop scanner
-  try {
-    Quagga.stop();
-  } catch (e) {}
   
   // Hubungkan ke backend Apps Script via rg()
   rg('cariDataDiSpreadsheet', [teksBarcode])
@@ -2741,28 +2760,34 @@ function processBarcode(teksBarcode) {
       } else {
         toast('Barcode ' + teksBarcode + ' belum terdaftar di spreadsheet master', 'error');
         setDebug('Barcode tidak ditemukan. Silakan coba lagi.');
-        // Restart scanner
         scanActive = true;
-        Quagga.start();
+        var video = document.getElementById('scanVideo');
+        if (video) {
+          startScanning(video);
+        }
       }
     })
     .catch(function(err) {
       toast('Gagal mencari data: ' + (err.message || err), 'error');
       setDebug('Gagal menghubungi server.');
-      // Restart scanner
       scanActive = true;
-      Quagga.start();
+      var video = document.getElementById('scanVideo');
+      if (video) {
+        startScanning(video);
+      }
     });
 }
 
 function closeScanModal(){
   scanActive = false;
-  try {
-    Quagga.stop();
-  } catch (e) {}
+  if (animationFrameId) {
+    cancelAnimationFrame(animationFrameId);
+  }
   document.getElementById('scanModal').classList.remove('active');
-  // Clear input
-  document.getElementById('manualBarcodeInput').value = '';
+  if(scanStream){
+    scanStream.getTracks().forEach(t => t.stop());
+    scanStream = null;
+  }
 }
 
 function useManualBarcode(){
