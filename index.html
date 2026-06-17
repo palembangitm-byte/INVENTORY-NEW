@@ -1208,6 +1208,8 @@ function rg(fn,args){
       } else if (fn === 'uploadImage') {
         payload.b64Data = args[0];
         payload.fileName = args[1];
+      } else if (fn === 'saveAppSettings') {
+        payload.settings = args[0];
       } else if (args && args.length === 1) {
         // For single argument functions like addInventoryData, deleteInventoryData, etc.
         payload[fn === 'getNextBarcode' ? 'dept' : fn === 'deleteInventoryData' ? 'id' : fn === 'approveInventoryData' ? 'id' : fn === 'unapproveInventoryData' ? 'id' : fn === 'deleteUser' ? 'id' : 'fd'] = args[0];
@@ -1316,7 +1318,9 @@ function enterApp(){
   document.getElementById('userAvatar').textContent=CU.name.charAt(0).toUpperCase();
   document.getElementById('adminMenu').style.display=(CU.role==='admin')?'':'none';
   sL();
-  Promise.all([rg('getDepartments',[]), rg('getAllInventoryData', [])])
+  
+  // Load shared settings and other data
+  Promise.all([rg('getDepartments',[]), rg('getAllInventoryData', []), loadAppSettingsFromSpreadsheet()])
     .then(function(r){
       AD=r[0]||[];
       AI=r[1]||[];
@@ -2176,6 +2180,7 @@ function genReport(){
 window.addEventListener('DOMContentLoaded',function(){
   setTimeout(function(){hL();},400);
   loadSavedSettings();
+  loadAppSettingsFromSpreadsheet();
 });
 
 /* ============================================================
@@ -2203,6 +2208,7 @@ var ST = {
 };
 
 var STORAGE_KEY = 'invAppSettings_v1';
+var APP_SETTINGS = {}; // Settings from Spreadsheet (shared across all users)
 
 /* ---- Load from localStorage ---- */
 function loadSavedSettings(){
@@ -2212,6 +2218,21 @@ function loadSavedSettings(){
   }catch(e){}
   syncUIFromState();
   applySettings();
+}
+
+/* ---- Load App Settings from Spreadsheet (shared) ---- */
+async function loadAppSettingsFromSpreadsheet(){
+  try{
+    const settings = await rg('getAppSettings', []);
+    APP_SETTINGS = settings || {};
+    if(APP_SETTINGS.bgImageUrl){
+      ST.bgImageUrl = APP_SETTINGS.bgImageUrl;
+      ST.bgType = 'image';
+    }
+    applySettings();
+  }catch(e){
+    console.log('Error loading app settings:', e);
+  }
 }
 
 /* ---- Sync form controls from ST ---- */
@@ -2320,31 +2341,77 @@ function buildCustomGradient(){
 }
 
 /* ---- BG Image upload ---- */
-function handleBgImageUpload(input){
+async function handleBgImageUpload(input){
   if(!input.files||!input.files[0]) return;
   var f=input.files[0];
   if(f.size>5*1024*1024){toast('Gambar terlalu besar (maks 5MB)','error');return;}
-  var reader=new FileReader();
-  reader.onload=function(e){
-    ST.bgImageData=e.target.result;
-    var nameEl=document.getElementById('bgFileName');
-    if(nameEl) nameEl.textContent=f.name;
-    var tr=document.getElementById('bgThumbRow'),ti=document.getElementById('bgThumbImg');
-    var tn=document.getElementById('bgThumbName'),ts=document.getElementById('bgThumbSize');
-    if(tr){tr.style.display='';}
-    if(ti) ti.src=e.target.result;
-    if(tn) tn.textContent=f.name;
-    if(ts) ts.textContent=(f.size/1024).toFixed(0)+' KB';
-    applySettings();
-  };
-  reader.readAsDataURL(f);
+  
+  // Show loading
+  toast('Mengupload gambar background...','info');
+  
+  try{
+    // 1. Convert to base64
+    var reader=new FileReader();
+    reader.onload=async function(e){
+      var b64Data = e.target.result.split(',')[1];
+      
+      // 2. Upload to Drive
+      const imageUrl = await rg('uploadImage', [b64Data, 'bg-' + Date.now() + '-' + f.name]);
+      
+      // 3. Convert Drive URL to embed URL for background
+      var embedUrl = imageUrl;
+      var fileIdMatch = imageUrl.match(/\/file\/d\/([^\/]+)\//);
+      if(fileIdMatch){
+        embedUrl = 'https://lh3.googleusercontent.com/d/' + fileIdMatch[1];
+      }
+      
+      // 4. Save URL to Spreadsheet
+      await rg('saveAppSettings', [{ bgImageUrl: embedUrl }]);
+      
+      // 5. Update local state
+      APP_SETTINGS.bgImageUrl = embedUrl;
+      ST.bgImageUrl = embedUrl;
+      ST.bgType = 'image';
+      ST.bgImageData = ''; // Clear old base64 data
+      
+      // Update UI
+      var nameEl=document.getElementById('bgFileName');
+      if(nameEl) nameEl.textContent=f.name;
+      var tr=document.getElementById('bgThumbRow'),ti=document.getElementById('bgThumbImg');
+      var tn=document.getElementById('bgThumbName'),ts=document.getElementById('bgThumbSize');
+      if(tr){tr.style.display='';}
+      if(ti) ti.src=embedUrl;
+      if(tn) tn.textContent=f.name;
+      if(ts) ts.textContent=(f.size/1024).toFixed(0)+' KB';
+      
+      applySettings();
+      autoSaveSettings();
+      toast('Gambar background berhasil diupload dan dibagikan ke semua user!','success');
+    };
+    reader.readAsDataURL(f);
+  }catch(e){
+    toast('Gagal upload gambar background: ' + (e.message || e),'error');
+  }
 }
-function clearBgImage(){
+async function clearBgImage(){
   ST.bgImageData='';
+  ST.bgImageUrl='';
+  APP_SETTINGS.bgImageUrl='';
+  
   var tr=document.getElementById('bgThumbRow');if(tr)tr.style.display='none';
   var fn=document.getElementById('bgFileName');if(fn)fn.textContent='';
   var fi=document.getElementById('bgImageFile');if(fi)fi.value='';
+  
+  // Clear from Spreadsheet
+  try{
+    await rg('saveAppSettings', [{ bgImageUrl: '' }]);
+    toast('Gambar background berhasil dihapus untuk semua user!','success');
+  }catch(e){
+    toast('Gagal menghapus gambar background: ' + (e.message || e),'error');
+  }
+  
   applySettings();
+  autoSaveSettings();
 }
 
 /* ---- BG URL ---- */
@@ -2462,7 +2529,13 @@ function applySettings(){
     var bgCss='', overlayCss='';
     var opa = (ST.overlayOpacity/100).toFixed(2);
 
-    if(ST.bgType==='color'){
+    // Prioritize shared background from Spreadsheet
+    if(APP_SETTINGS.bgImageUrl){
+      lbg.style.backgroundImage = 'url("'+APP_SETTINGS.bgImageUrl+'")';
+      lbg.style.backgroundSize = 'cover';
+      lbg.style.backgroundPosition = 'center';
+      overlayCss = 'rgba(0,0,0,'+opa+')';
+    } else if(ST.bgType==='color'){
       bgCss = ST.bgColor;
       lbg.style.background = bgCss;
     } else if(ST.bgType==='gradient'){
