@@ -571,7 +571,7 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
       <div class="table-wrapper">
         <div class="table-toolbar">
           <div style="display:flex; gap:8px; align-items:center; flex:1;">
-            <div class="sb" style="margin:0;"><i class="fas fa-search"></i><input type="text" id="searchDM" placeholder="Cari deskripsi / barcode..." oninput="renderDM()"></div>
+            <div class="sb" style="margin:0;"><i class="fas fa-search"></i><input type="text" id="searchDM" placeholder="Cari deskripsi / barcode..." oninput="highlightedBarcode = null; renderDM();"></div>
             <button class="btn btn-primary btn-sm" onclick="openScanModal()"><i class="fas fa-camera"></i> Scan Barcode</button>
           </div>
           <div class="filters">
@@ -1118,6 +1118,14 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
       </div>
       <div id="scanDebug" style="margin-top:8px; color:var(--gray-muted); font-size:11px;"></div>
       
+      <!-- Upload Gambar Barcode -->
+      <div style="margin-top:12px; display:flex; gap:8px;">
+        <input type="file" id="barcodeImageInput" accept="image/*" style="display:none;" onchange="handleBarcodeImageUpload(event)">
+        <button class="btn btn-outline btn-sm" style="flex:1;" onclick="document.getElementById('barcodeImageInput').click()">
+          <i class="fas fa-image"></i> Upload Gambar Barcode
+        </button>
+      </div>
+      
       <!-- Input Manual -->
       <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
         <div style="font-size:12px; color:var(--gray-muted); margin-bottom:8px;"><i class="fas fa-keyboard"></i> Atau input manual / link barcode:</div>
@@ -1622,7 +1630,13 @@ function renderDM(){
       imgThumb='<img class="img-thumb" src="'+es(thumbSrc)+'" alt="foto" style="margin-right:4px" onclick="openIM(\''+es(imgUrl)+'\',\''+es(dlUrl2)+'\')" onerror="this.style.display=\'none\'">';
     }
 
-    h+='<tr>'+
+    // Check if we need to highlight this row
+    const itemBarcode = String(gV(it, 'Barcode') || '').trim();
+    const rowClass = (highlightedBarcode && itemBarcode === highlightedBarcode.trim()) 
+      ? ' style="background: rgba(59, 130, 246, 0.3) !important;"' 
+      : '';
+    
+    h+='<tr'+rowClass+'>'+
        '<td class="row-num">'+(i+1)+'</td>'+
        '<td style="max-width:180px;white-space:normal;line-height:1.4;font-weight:500;">'+es(gV(it, 'Description'))+'</td>'+
        '<td><span class="dept-tag">'+es(gV(it, 'Department'))+'</span></td>'+
@@ -2756,7 +2770,8 @@ function processBarcode(teksBarcode) {
         closeScanModal();
         // Navigate to Data Master tab
         nav('datamaster');
-        renderDM();
+        // Highlight the row
+        highlightBarcodeRow(teksBarcode);
       } else {
         toast('Barcode ' + teksBarcode + ' belum terdaftar di spreadsheet master', 'error');
         setDebug('Barcode tidak ditemukan. Silakan coba lagi.');
@@ -2788,6 +2803,70 @@ function closeScanModal(){
     scanStream.getTracks().forEach(t => t.stop());
     scanStream = null;
   }
+}
+
+// Global variable to store the barcode we're highlighting
+let highlightedBarcode = null;
+
+// Function to handle barcode image upload
+async function handleBarcodeImageUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  setDebug('Memproses gambar...');
+  
+  try {
+    // Create image element
+    const img = new Image();
+    img.src = URL.createObjectURL(file);
+    
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+    });
+    
+    // Create canvas to draw image
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = img.width;
+    tempCanvas.height = img.height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx.drawImage(img, 0, 0);
+    
+    // Scan barcode from canvas
+    if ('BarcodeDetector' in window) {
+      const detector = new BarcodeDetector({
+        formats: ['code_128', 'ean_13', 'ean_8', 'code_39', 'upc_a', 'upc_e']
+      });
+      const barcodes = await detector.detect(tempCanvas);
+      
+      if (barcodes.length > 0) {
+        const barcode = barcodes[0].rawValue;
+        setDebug('Barcode ditemukan di gambar!');
+        processBarcode(barcode);
+      } else {
+        toast('Tidak menemukan barcode di gambar!', 'warning');
+        setDebug('Silakan coba gambar lain.');
+      }
+    } else {
+      toast('Browser tidak mendukung scan barcode dari gambar!', 'error');
+      setDebug('Browser tidak mendukung scan barcode.');
+    }
+    
+  } catch (err) {
+    toast('Gagal memproses gambar: ' + err.message, 'error');
+    console.error(err);
+    setDebug('Error memproses gambar.');
+  }
+  
+  // Reset input file
+  event.target.value = '';
+}
+
+// Function to highlight row in Data Master
+function highlightBarcodeRow(barcode) {
+  highlightedBarcode = barcode;
+  // Re-render Data Master to apply highlight
+  renderDM();
 }
 
 function useManualBarcode(){
