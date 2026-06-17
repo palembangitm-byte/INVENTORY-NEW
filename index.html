@@ -1143,7 +1143,7 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
 
 <!-- SCRIPTS -->
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 
 <script>
 /* ============================================================
@@ -2630,7 +2630,7 @@ function resetAllSettings(){
 }
 
 /* ---- Barcode Scan Functions ---- */
-let html5QrCodeScanner = null;
+let html5QrCode = null;
 
 function setDebug(msg){
   var d=document.getElementById('scanDebug');
@@ -2658,42 +2658,44 @@ async function openScanModal(){
   setDebug('Meminta izin kamera...');
   
   try {
-    // Siapkan container untuk html5-qrcode
+    // Siapkan container untuk video
     var scanContainer = document.getElementById('scanContainer');
     scanContainer.innerHTML = '<div id="qr-reader" style="width:100%; min-height:240px;"></div>';
     
-    // Inisialisasi html5-qrcode scanner dengan fokus CODE 128
-    html5QrCodeScanner = new Html5QrcodeScanner(
-      "qr-reader", 
-      { 
-        fps: 5, // Kurangi fps agar lebih stabil
-        qrbox: { width: 300, height: 300 }, // Perbesar area scan
-        rememberLastUsedCamera: true,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E
-        ]
-      }, 
-      false // Verbose false
-    );
+    // Inisialisasi Html5Qrcode
+    html5QrCode = new Html5Qrcode("qr-reader");
     
-    // Start scanning
-    html5QrCodeScanner.render(
-      function(decodedText, decodedResult) {
-        // Barcode terdeteksi!
+    // Konfigurasi scanner
+    const config = {
+      fps: 10,
+      qrbox: { width: 250, height: 250 },
+      aspectRatio: 1.0
+    };
+    
+    // Format barcode yang didukung
+    const formats = [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E
+    ];
+    
+    // Mulai scan
+    await html5QrCode.start(
+      { facingMode: "environment" }, // Kamera belakang
+      config,
+      (decodedText, decodedResult) => {
+        // Callback ketika barcode terdeteksi
         console.log('Barcode detected:', decodedText, decodedResult);
         if (scanActive) {
           setDebug('Barcode terdeteksi!');
           processBarcode(decodedText);
         }
       },
-      function(errorMessage) {
-        // Error saat scanning, biarkan saja (normal jika barcode tidak terlihat)
+      (errorMessage) => {
+        // Callback ketika scan gagal (normal)
         // console.log('Scan error:', errorMessage);
       }
     );
@@ -2719,21 +2721,16 @@ function processBarcode(teksBarcode) {
   if (!isURL(cleanBarcode) && !isValidAppBarcode(cleanBarcode)) {
     toast('Barcode tidak sesuai format app! Format: XXX-000000000000', 'warning');
     setDebug('Format barcode salah. Silakan coba barcode app.');
-    // Restart scanner jika modal masih terbuka
-    setTimeout(function() {
-      if (document.getElementById('scanModal').classList.contains('active')) {
-        openScanModal();
-      }
-    }, 1000);
+    // Jangan restart, biarkan user scan lagi
     return;
   }
   
   scanActive = false;
   
   // Stop scanner
-  if (html5QrCodeScanner) {
-    html5QrCodeScanner.clear().catch(console.error);
-    html5QrCodeScanner = null;
+  if (html5QrCode) {
+    html5QrCode.stop().catch(console.error);
+    html5QrCode = null;
   }
   
   // Hubungkan ke backend Apps Script via rg()
@@ -2776,9 +2773,9 @@ function processBarcode(teksBarcode) {
 
 function closeScanModal(){
   scanActive = false;
-  if (html5QrCodeScanner) {
-    html5QrCodeScanner.clear().catch(console.error);
-    html5QrCodeScanner = null;
+  if (html5QrCode) {
+    html5QrCode.stop().catch(console.error);
+    html5QrCode = null;
   }
   document.getElementById('scanModal').classList.remove('active');
 }
@@ -2794,21 +2791,8 @@ async function handleBarcodeImageUpload(event) {
   setDebug('Memproses gambar...');
   
   try {
-    const html5QrCode = new Html5Qrcode("scanContainer");
-    const result = await html5QrCode.scanFile(
-      file, 
-      true, 
-      { 
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E
-        ] 
-      }
-    );
+    const qrCodeScanner = new Html5Qrcode("scanContainer");
+    const result = await qrCodeScanner.scanFile(file, true);
     if (result) {
       setDebug('Barcode ditemukan di gambar!');
       processBarcode(result);
