@@ -2661,7 +2661,7 @@ async function openScanModal(){
     
     // Mulai scan tanpa batasan format spesifik dan tanpa qrbox (scan seluruh area)
     await html5QrCode.start(
-      { facingMode: "environment" }, // Kamera belakang
+      { facingMode: "environment", width: { ideal: 1920 }, height: { ideal: 1080 } }, // Kamera belakang dengan resolusi Full HD
       config,
       (decodedText, decodedResult) => {
         // Callback ketika barcode terdeteksi
