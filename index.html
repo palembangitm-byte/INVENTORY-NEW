@@ -2652,8 +2652,6 @@ function isValidAppBarcode(barcode) {
   return appBarcodePattern.test(barcode.trim());
 }
 
-let html5QrCodeScanner = null;
-
 async function openScanModal(){
   document.getElementById('scanModal').classList.add('active');
   scanActive = true;
