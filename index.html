@@ -2638,47 +2638,10 @@ function setDebug(msg){
   console.log('[Scan Debug]', msg);
 }
 
-// Function to extract barcode from various URL formats
+// Function to handle barcode input (support both plain barcode and URL barcode)
 function extractBarcodeFromInput(input) {
   if (!input) return '';
-  
-  // If it's a plain barcode (no URL), return as-is
-  if (!input.includes('http://') && !input.includes('https://')) {
-    return input.trim();
-  }
-  
-  // Try to extract from query parameters first
-  try {
-    const url = new URL(input);
-    // Check common query params
-    const params = ['barcode', 'code', 'id', 'item'];
-    for (const param of params) {
-      if (url.searchParams.has(param)) {
-        return url.searchParams.get(param).trim();
-      }
-    }
-    // Check path segments
-    const pathSegments = url.pathname.split('/').filter(Boolean);
-    // Look for segments that look like barcodes
-    for (const segment of pathSegments) {
-      // Barcodes are usually numbers or alphanumeric with dashes
-      if (/^[A-Z0-9\-]+$/.test(segment)) {
-        return segment.trim();
-      }
-    }
-    // Check hash
-    if (url.hash) {
-      const hash = url.hash.slice(1);
-      if (/^[A-Z0-9\-]+$/.test(hash)) {
-        return hash.trim();
-      }
-    }
-  } catch (e) {
-    // Not a valid URL, treat as plain text
-  }
-  
-  // If we couldn't extract, just take the last part of the input
-  return input.split(/[\/?#&=]/).pop().trim();
+  return input.trim(); // Kembalikan input as-is untuk membandingkan dengan kolom Barcode dan URL Barcode
 }
 
 // Fungsi untuk memvalidasi format barcode app (misal: ITD-000000000001)
@@ -2689,24 +2652,27 @@ function isValidAppBarcode(barcode) {
   return appBarcodePattern.test(barcode.trim());
 }
 
+let html5QrCodeInstance = null;
+
 async function openScanModal(){
   document.getElementById('scanModal').classList.add('active');
   scanActive = true;
-  setDebug('Memulai scanner...');
+  setDebug('Meminta izin kamera...');
   
   try {
     // Siapkan container untuk html5-qrcode
     var scanContainer = document.getElementById('scanContainer');
-    scanContainer.innerHTML = '<div id="qr-reader" style="width:100%; min-height:240px;"></div>';
+    scanContainer.innerHTML = '<video id="qr-video" style="width:100%; height:100%; min-height:240px; border-radius: var(--radius-sm);"></video>';
     
-    // Inisialisasi html5-qrcode scanner dengan fokus format CODE 128
-    html5QrCodeScanner = new Html5QrcodeScanner(
-      "qr-reader", 
+    // Inisialisasi html5-qrcode dengan mode kamera manual
+    html5QrCodeInstance = new Html5Qrcode("qr-video");
+    
+    // Mulai scan
+    await html5QrCodeInstance.start(
+      { facingMode: "environment" }, // Prioritaskan kamera belakang
       { 
         fps: 10, 
-        qrbox: { width: 250, height: 250 }, 
-        rememberLastUsedCamera: true,
-        supportedScanTypes: [Html5QrcodeScanType.SCAN_TYPE_CAMERA],
+        qrbox: { width: 250, height: 250 },
         formatsToSupport: [
           Html5QrcodeSupportedFormats.CODE_128,
           Html5QrcodeSupportedFormats.CODE_39,
@@ -2715,12 +2681,7 @@ async function openScanModal(){
           Html5QrcodeSupportedFormats.UPC_A,
           Html5QrcodeSupportedFormats.UPC_E
         ]
-      }, 
-      false
-    );
-    
-    // Start scanning
-    html5QrCodeScanner.render(
+      },
       function(decodedText, decodedResult) {
         // Barcode terdeteksi!
         if (scanActive) {
@@ -2736,18 +2697,22 @@ async function openScanModal(){
     setDebug('Scanner siap! Arahkan ke barcode app...');
     
   } catch (e) {
+    console.error('Scanner Error:', e);
     setDebug('Error: ' + (e.name + ' - ' + e.message));
     toast('Gagal memulai scanner: ' + e.message, 'error');
-    console.error(e);
   }
+}
+
+function isURL(str) {
+  return str.startsWith('http://') || str.startsWith('https://');
 }
 
 function processBarcode(teksBarcode) {
   const cleanBarcode = teksBarcode.trim();
   setDebug('Memproses barcode: ' + cleanBarcode);
   
-  // Validasi format barcode
-  if (!isValidAppBarcode(cleanBarcode)) {
+  // Hanya validasi format jika bukan URL
+  if (!isURL(cleanBarcode) && !isValidAppBarcode(cleanBarcode)) {
     toast('Barcode tidak sesuai format app! Format: XXX-000000000000', 'warning');
     setDebug('Format barcode salah. Silakan coba barcode app.');
     // Restart scanner jika modal masih terbuka
@@ -2762,9 +2727,9 @@ function processBarcode(teksBarcode) {
   scanActive = false;
   
   // Stop scanner
-  if (html5QrCodeScanner) {
-    html5QrCodeScanner.clear().catch(console.error);
-    html5QrCodeScanner = null;
+  if (html5QrCodeInstance) {
+    html5QrCodeInstance.stop().catch(console.error);
+    html5QrCodeInstance = null;
   }
   
   // Hubungkan ke backend Apps Script via rg()
@@ -2780,7 +2745,7 @@ function processBarcode(teksBarcode) {
         // Navigate to Data Master tab
         nav('datamaster');
         // Highlight the row
-        highlightBarcodeRow(cleanBarcode);
+        highlightBarcodeRow(data.Barcode || cleanBarcode);
       } else {
         toast('Barcode ' + cleanBarcode + ' belum terdaftar di spreadsheet master', 'error');
         setDebug('Barcode tidak ditemukan. Silakan coba lagi.');
@@ -2807,9 +2772,9 @@ function processBarcode(teksBarcode) {
 
 function closeScanModal(){
   scanActive = false;
-  if (html5QrCodeScanner) {
-    html5QrCodeScanner.clear().catch(console.error);
-    html5QrCodeScanner = null;
+  if (html5QrCodeInstance) {
+    html5QrCodeInstance.stop().catch(console.error);
+    html5QrCodeInstance = null;
   }
   document.getElementById('scanModal').classList.remove('active');
 }
