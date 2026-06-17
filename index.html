@@ -2706,11 +2706,13 @@ function processBarcode(teksBarcode) {
   // Hubungkan ke backend Apps Script via rg()
   rg('cariDataDiSpreadsheet', [teksBarcode])
     .then(function(data) {
-      if (data && data.status === "sukses") {
+      if (data && data.success) {
         // Isi ke kotak pencarian
-        qs('#searchDM').value = teksBarcode;
-        toast('Barcode ditemukan! ' + data.namaBarang + ' (Stok: ' + data.stok + ')', 'success');
+        document.getElementById('searchDM').value = teksBarcode;
+        toast('Barcode ditemukan! ' + (data.Description || 'Item') + ' (Dept: ' + (data.Department || '-') + ')', 'success');
         closeScanModal();
+        // Navigate to Data Master tab
+        nav('datamaster');
         renderDM();
       } else {
         toast('Barcode ' + teksBarcode + ' belum terdaftar di spreadsheet master', 'error');
@@ -2723,7 +2725,7 @@ function processBarcode(teksBarcode) {
       }
     })
     .catch(function(err) {
-      toast('Gagal mencari data: ' + err.message, 'error');
+      toast('Gagal mencari data: ' + (err.message || err), 'error');
       setDebug('Gagal menghubungi server.');
       scanActive = true;
       var video = document.getElementById('scanVideo');
