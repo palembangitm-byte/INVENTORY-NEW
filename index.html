@@ -1125,15 +1125,6 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
           <i class="fas fa-image"></i> Upload Gambar Barcode
         </button>
       </div>
-      
-      <!-- Input Manual -->
-    <div style="margin-top:16px; border-top:1px solid var(--border); padding-top:12px;">
-      <div style="font-size:12px; color:var(--gray-muted); margin-bottom:8px;"><i class="fas fa-keyboard"></i> Atau input manual:</div>
-      <div style="display:flex; gap:8px;">
-        <input type="text" id="manualBarcodeInput" style="flex:1; padding:10px 13px; background: var(--gray-dark); border:1px solid var(--gray-mid); border-radius: var(--radius-sm); color: var(--white); font-family: inherit; font-size:13px; outline:none; transition:border-color .2s, box-shadow .2s;" placeholder="Masukkan nomor barcode...">
-        <button class="btn btn-primary btn-sm" onclick="useManualBarcode()">Gunakan</button>
-      </div>
-    </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline btn-sm" onclick="closeScanModal()">Batal</button>
@@ -2661,7 +2652,7 @@ async function openScanModal(){
     
     // Konfigurasi scanner untuk sensitivitas maksimal (tanpa qrbox)
     const config = {
-      fps: 25, // Lebih tinggi lagi untuk scan lebih sering
+      fps: 60, // FPS maksimal untuk scan tercepat
       aspectRatio: 1.333333, // Ratio 4:3, lebih natural untuk kamera
       disableFlip: false, // Izinkan flip
       showTorchButtonIfSupported: true // Tampilkan tombol senter jika didukung
