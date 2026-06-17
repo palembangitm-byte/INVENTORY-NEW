@@ -854,8 +854,8 @@ body{font-family:'Sora',sans-serif;background:var(--black);color:var(--white);mi
               <div style="flex:1;min-width:200px;">
                 <label style="font-size:11px;font-weight:600;color:var(--gray-muted);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:8px">Ukuran Logo (px)</label>
                 <div style="display:flex;align-items:center;gap:8px;">
-                  <input type="range" id="logoSize" min="40" max="200" value="80" style="width:100%;accent-color:var(--orange);" oninput="document.getElementById('logoSizeVal').textContent=this.value+'px';applySettings();saveLogoSettingsToSpreadsheet()">
-                  <span id="logoSizeVal" style="font-size:11px;color:var(--orange);min-width:40px;font-weight:700">80px</span>
+                  <input type="range" id="logoSize" min="250" max="600" value="250" style="width:100%;accent-color:var(--orange);" oninput="document.getElementById('logoSizeVal').textContent=this.value+'px';applySettings();saveLogoSettingsToSpreadsheet()">
+                  <span id="logoSizeVal" style="font-size:11px;color:var(--orange);min-width:60px;font-weight:700">250px</span>
                 </div>
               </div>
               <div style="flex:1;min-width:200px;">
@@ -2255,7 +2255,7 @@ var ST = {
   radius        : 9,
   tableFontSize : '12px',
   logoUrl       : '',   // URL logo from Drive
-  logoSize      : 80,   // Logo size in pixels
+  logoSize      : 250,  // Logo size in pixels (250-600)
   logoPosition  : 'top-left' // Logo position: top-left, top-center, top-right, bottom-left, bottom-center, bottom-right
 };
 
@@ -2285,7 +2285,7 @@ async function loadAppSettingsFromSpreadsheet(){
       ST.logoUrl = APP_SETTINGS.logoUrl;
     }
     if(APP_SETTINGS.logoSize){
-      ST.logoSize = parseInt(APP_SETTINGS.logoSize) || 80;
+      ST.logoSize = parseInt(APP_SETTINGS.logoSize) || 250;
     }
     if(APP_SETTINGS.logoPosition){
       ST.logoPosition = APP_SETTINGS.logoPosition;
@@ -2308,9 +2308,9 @@ function syncUIFromState(){
   // Logo settings
   var logoSizeEl = document.getElementById('logoSize');
   if(logoSizeEl) {
-    logoSizeEl.value = ST.logoSize || 80;
+    logoSizeEl.value = ST.logoSize || 250;
     var logoSizeValEl = document.getElementById('logoSizeVal');
-    if(logoSizeValEl) logoSizeValEl.textContent = (ST.logoSize || 80) + 'px';
+    if(logoSizeValEl) logoSizeValEl.textContent = (ST.logoSize || 250) + 'px';
   }
   var logoPosEl = document.getElementById('logoPosition');
   if(logoPosEl) logoPosEl.value = ST.logoPosition || 'top-left';
@@ -2518,7 +2518,7 @@ async function handleLogoUpload(input){
       // Save to Spreadsheet
       await rg('saveAppSettings', [{ 
         logoUrl: embedUrl, 
-        logoSize: ST.logoSize || 80, 
+        logoSize: ST.logoSize || 250, 
         logoPosition: ST.logoPosition || 'top-left' 
       }]);
       
@@ -2580,7 +2580,7 @@ async function saveLogoSettingsToSpreadsheet(){
     try{
       await rg('saveAppSettings', [{ 
         logoUrl: APP_SETTINGS.logoUrl || ST.logoUrl,
-        logoSize: ST.logoSize || 80,
+        logoSize: ST.logoSize || 250,
         logoPosition: ST.logoPosition || 'top-left'
       }]);
       // Update APP_SETTINGS
@@ -2748,12 +2748,12 @@ function applySettings(){
       // Read logo settings from UI controls if available
       var logoSizeEl = document.getElementById('logoSize');
       var logoPosEl = document.getElementById('logoPosition');
-      if(logoSizeEl) ST.logoSize = parseInt(logoSizeEl.value) || 80;
+      if(logoSizeEl) ST.logoSize = parseInt(logoSizeEl.value) || 250;
       if(logoPosEl) ST.logoPosition = logoPosEl.value || 'top-left';
       
       // Use APP_SETTINGS values if available (from Spreadsheet)
       var logoUrl = APP_SETTINGS.logoUrl || ST.logoUrl;
-      var logoSize = APP_SETTINGS.logoSize || ST.logoSize || 80;
+      var logoSize = APP_SETTINGS.logoSize || ST.logoSize || 250;
       var logoPosition = APP_SETTINGS.logoPosition || ST.logoPosition || 'top-left';
       
       if(logoUrl){
@@ -2908,7 +2908,7 @@ function resetAllSettings(){
       accent:'#F97316',showHero:true,animCard:true,appTitle:'INVENTORY APPS',
       appSubtitle:'Sistem manajemen inventaris modern untuk mengelola aset hotel dengan mudah dan efisien.',
       sidebarTitle:'INVENTORY',sidebarColor:'#0C0C0C',radius:9,tableFontSize:'12px',
-      logoUrl:'',logoSize:80,logoPosition:'top-left'};
+      logoUrl:'',logoSize:250,logoPosition:'top-left'};
   // Hide logo thumbnail
   var logoThumbRow = document.getElementById('logoThumbRow');
   if(logoThumbRow) logoThumbRow.style.display='none';
